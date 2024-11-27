@@ -40,7 +40,7 @@ out where the scripts are stored, and start them with python for you.
 #### Sh/Bash/Zsh
 Source convenience wrapper functions in your profile.
 ```sh
-source . $(PathToThisRepoRoot)/sh/local_git_in_p4.sh
+source $(PathToThisRepoRoot)/sh/local_git_in_p4.sh
 ```
 This creates two functions: `sync_local_git_with_p4` and `edit_local_git_changes_in_p4`
 
