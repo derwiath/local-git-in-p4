@@ -35,10 +35,18 @@ if not workspace_dir:
 
 
 def create_parser():
-    parser = argparse.ArgumentParser(description='Build utilities')
-    parser.add_argument('--base-branch', default='main',
-                        help='Base branch where p4 and git are in sync')
-    parser.add_argument('-n', '--dry-run', default=False, action='store_true')
+    parser = argparse.ArgumentParser(
+        description='Find files that have changed between ' +
+                    ' current git HEAD and base branch, and open for edit in p4'
+    )
+    parser.add_argument(
+        '--base-branch', default='main',
+        help='Base branch where p4 and git are in sync. Default is main'
+    )
+    parser.add_argument(
+        '-n', '--dry-run', default=False, action='store_true',
+        help='Pretend and print all commands, but do not execute'
+    )
     return parser
 
 

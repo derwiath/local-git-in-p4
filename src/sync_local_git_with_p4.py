@@ -35,9 +35,16 @@ if not workspace_dir:
 
 
 def create_parser():
-    parser = argparse.ArgumentParser(description='Sync local git repo with a perforce workspace')
+    parser = argparse.ArgumentParser(
+        description='Sync local git repo with a perforce workspace')
     parser.add_argument('changelist', help='Changelist to sync')
-    parser.add_argument('-f', '--force', default=False, action='store_true')
+    parser.add_argument(
+        '-f', '--force', default=False, action='store_true',
+        help='Force sync encountered writable files.'
+        ' When clobber is not enabled on your workspace, p4 will fail to sync'
+        ' files that are read-only. git removes the readonly' +
+        ' flag on touched files.'
+    )
     return parser
 
 
