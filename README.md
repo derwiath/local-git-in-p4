@@ -122,6 +122,9 @@ edit_local_git_changes_in_p4
 git checkout main
 sync_local_git_with_p4 126
 
+# Remove old branch as you don't need it anymore
+git branch -D my-fancy-feature
+
 # Start working on the next feature
 git checkout -b my-next-fancy-feature
 
