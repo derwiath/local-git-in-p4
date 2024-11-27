@@ -51,6 +51,41 @@ Import convenience wrapper commands in your Powershell user profile, find out wh
 ```
 Creates two commands: `Sync-LocalGitWithP4` and `Edit-LocalGitChangesInP4`
 
+## Usage
+
+### Sync Local Git Repository With Perforce
+
+```sh
+usage: sync_local_git_with_p4.py [-h] [-f] changelist
+
+Sync local git repo with a perforce workspace
+
+positional arguments:
+  changelist   Changelist to sync
+
+options:
+  -h, --help   show this help message and exit
+  -f, --force  Force sync encountered writable files. When clobber is not enabled on your workspace, p4 will fail to sync files that are read-only. git removes the readonly flag on
+               touched files.
+```
+
+### Edit Local Git Changes In Perforce
+
+This script finds out which files have changed between your current git `HEAD`
+and the base branch, usually `main`. The found files are opened for edit in perforce.
+
+```sh
+usage: edit_local_git_changes_in_p4.py [-h] [--base-branch BASE_BRANCH] [-n]
+
+Find files that have changed between current git HEAD and base branch, and open for edit in p4
+
+options:
+  -h, --help            show this help message and exit
+  --base-branch BASE_BRANCH
+                        Base branch where p4 and git are in sync. Default is main
+  -n, --dry-run         Pretend and print all commands, but do not execute
+```
+
 ## Usage example
 
 ### Zsh/Bash/Sh
