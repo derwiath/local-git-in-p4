@@ -9,14 +9,14 @@ else
     exit 1
 fi
 
-root_dir=$(dirname "$script_dir")
+local_git_in_p4_root=$(dirname "$script_dir")
 
 sync_local_git_with_p4() {
-  local python_script="$root_dir/src/sync_local_git_with_p4.py"
+  local python_script="$local_git_in_p4_root/src/sync_local_git_with_p4.py"
   python3 "$python_script" "$@"
 }
 
 edit_local_git_changes_in_p4() {
-  local python_script="$root_dir/src/edit_local_git_changes_in_p4.py"
+  local python_script="$local_git_in_p4_root/src/edit_local_git_changes_in_p4.py"
   python3 "$python_script" "$@"
 }
