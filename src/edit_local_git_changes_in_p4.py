@@ -40,6 +40,10 @@ def create_parser():
                     ' current git HEAD and base branch, and open for edit in p4'
     )
     parser.add_argument(
+        'changelist',
+        help='Changelist to update'
+    )
+    parser.add_argument(
         '-b', '--base-branch', default='HEAD~1',
         help='Base branch where p4 and git are in sync. Default is main'
     )
@@ -151,33 +155,33 @@ def main():
         print('Failed to get a list of changed files', file=sys.stderr)
 
     for filename in changes.adds:
-        res = run(['p4', 'add', filename],
+        res = run(['p4', 'add', '-c', args.changelist, filename],
                   cwd=workspace_dir, dry_run=args.dry_run)
         if res.returncode != 0:
             print('Failed to add file to perforce', file=sys.stderr)
             return False
 
     for filename in changes.mods:
-        res = run(['p4', 'edit', filename],
+        res = run(['p4', 'edit', '-c', args.changelist, filename],
                   cwd=workspace_dir, dry_run=args.dry_run)
         if res.returncode != 0:
             print('Failed to open file for edit in perforce', file=sys.stderr)
             return False
 
     for filename in changes.dels:
-        res = run(['p4', 'delete', filename],
+        res = run(['p4', 'delete', '-c', args.changelist, filename],
                   cwd=workspace_dir, dry_run=args.dry_run)
         if res.returncode != 0:
             print('Failed to delete file from perforce', file=sys.stderr)
             return False
 
     for from_filename, to_filename in changes.moves:
-        res = run(['p4', 'delete', from_filename],
+        res = run(['p4', 'delete', '-c', args.changelist, from_filename],
                   cwd=workspace_dir, dry_run=args.dry_run)
         if res.returncode != 0:
             print('Failed to delete from-file in perforce', file=sys.stderr)
             return False
-        res = run(['p4', 'add', to_filename],
+        res = run(['p4', 'add', '-c', args.changelist, to_filename],
                   cwd=workspace_dir, dry_run=args.dry_run)
         if res.returncode != 0:
             print('Failed to add file to-file to perforce', file=sys.stderr)
