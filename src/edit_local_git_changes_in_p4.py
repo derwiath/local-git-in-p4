@@ -40,7 +40,7 @@ def create_parser():
                     ' current git HEAD and base branch, and open for edit in p4'
     )
     parser.add_argument(
-        '--base-branch', default='main',
+        '-b', '--base-branch', default='HEAD~1',
         help='Base branch where p4 and git are in sync. Default is main'
     )
     parser.add_argument(
