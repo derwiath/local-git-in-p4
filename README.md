@@ -1,7 +1,7 @@
 # local-git-in-p4
 Utility scripts for managing a local git repository within a perforce workspace.
 
-The idea is to have a `main` branch is keept in sync with the perforce depot.
+The idea is to have a `main` branch is kept in sync with the perforce depot.
 From the `main` you branch out feature branches, where you do your local
 changes, rebase on `main` whenever it is updated.
 This is a bit cumbersome to do manually, but this repo contains scripts
