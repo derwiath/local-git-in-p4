@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pergit"
+version = "1.0.0"
+description = "Utility for keeping a Perforce workspace and local git repo in sync"
+readme = "README.md"
+requires-python = ">=3.7"
+license = {text = "MIT"}
+authors = [
+    {name = "Andreas Andersson", email = "andreas@neoboid.com"}
+]
+keywords = ["perforce", "git", "version-control", "sync"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Version Control",
+]
+
+[project.scripts]
+pergit = "pergit.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/derwiath/local-git-in-p4"
+Repository = "https://github.com/derwiath/local-git-in-p4"
+Issues = "https://github.com/derwiath/local-git-in-p4/issues"

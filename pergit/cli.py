@@ -1,0 +1,108 @@
+"""
+Main CLI entry point for pergit.
+"""
+
+import argparse
+import sys
+from . import __version__
+from .sync import sync_command
+from .edit import edit_command
+
+
+def create_parser():
+    """Create the main argument parser."""
+    parser = argparse.ArgumentParser(
+        prog='pergit',
+        description='Utility for keeping a Perforce workspace and local git repo in sync',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  pergit sync 12345          # Sync with changelist 12345
+  pergit sync 12345 --force  # Force sync with writable files
+  pergit edit 12345          # Open git changes for edit in changelist 12345
+  pergit edit 12345 --dry-run # Preview what would be opened for edit
+        """
+    )
+
+    parser.add_argument(
+        '--version',
+        action='version',
+        version=f'pergit {__version__}'
+    )
+
+    subparsers = parser.add_subparsers(
+        dest='command',
+        help='Available commands',
+        metavar='COMMAND'
+    )
+
+    # Sync subcommand
+    sync_parser = subparsers.add_parser(
+        'sync',
+        help='Sync local git repository with a Perforce workspace',
+        description='Sync local git repository with a Perforce workspace'
+    )
+    sync_parser.add_argument(
+        'changelist',
+        help='Changelist to sync'
+    )
+    sync_parser.add_argument(
+        '-f', '--force',
+        action='store_true',
+        help='Force sync encountered writable files. When clobber is not enabled '
+             'on your workspace, p4 will fail to sync files that are read-only. '
+             'git removes the readonly flag on touched files.'
+    )
+
+    # Edit subcommand
+    edit_parser = subparsers.add_parser(
+        'edit',
+        help='Open local git changes for edit in Perforce',
+        description='Find files that have changed between current git HEAD and '
+        'base branch, and open for edit in p4'
+    )
+    edit_parser.add_argument(
+        'changelist',
+        help='Changelist to update'
+    )
+    edit_parser.add_argument(
+        '-b', '--base-branch',
+        default='HEAD~1',
+        help='Base branch where p4 and git are in sync. Default is HEAD~1'
+    )
+    edit_parser.add_argument(
+        '-n', '--dry-run',
+        action='store_true',
+        help='Pretend and print all commands, but do not execute'
+    )
+
+    return parser
+
+
+def main():
+    """Main entry point for the CLI."""
+    parser = create_parser()
+    args = parser.parse_args()
+
+    if not args.command:
+        parser.print_help()
+        return 1
+
+    try:
+        if args.command == 'sync':
+            return sync_command(args)
+        elif args.command == 'edit':
+            return edit_command(args)
+        else:
+            print(f'Unknown command: {args.command}', file=sys.stderr)
+            return 1
+    except KeyboardInterrupt:
+        print('\nOperation cancelled by user', file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(f'Error: {e}', file=sys.stderr)
+        return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())
