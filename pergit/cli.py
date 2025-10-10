@@ -21,6 +21,7 @@ Examples:
   pergit sync 12345          # Sync with changelist 12345
   pergit sync 12345 --force  # Force sync with writable files
   pergit edit 12345          # Open git changes for edit in changelist 12345
+  pergit edit new            # Create new changelist and open git changes for edit
   pergit edit 12345 --dry-run # Preview what would be opened for edit
         """
     )
@@ -64,7 +65,7 @@ Examples:
     )
     edit_parser.add_argument(
         'changelist',
-        help='Changelist to update'
+        help='Changelist to update, or "new" to create a new changelist'
     )
     edit_parser.add_argument(
         '-b', '--base-branch',

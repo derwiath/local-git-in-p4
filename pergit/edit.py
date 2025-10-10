@@ -5,6 +5,7 @@ Edit command implementation for pergit.
 import re
 import sys
 from .common import ensure_workspace, run
+from .list_changes import get_enumerated_change_description_since
 
 
 class LocalChanges:
@@ -89,6 +90,78 @@ def get_local_git_changes(base_branch, workspace_dir):
     return (0, changes)
 
 
+def create_new_changelist(base_branch, workspace_dir, dry_run=False):
+    """
+    Create a new Perforce changelist with description from git log.
+
+    Args:
+        base_branch: The base branch to compare against for description
+        workspace_dir: The workspace directory
+        dry_run: If True, don't actually create the changelist
+
+    Returns:
+        Tuple of (returncode, changelist_number or None)
+    """
+    # Get changelist description
+    returncode, description = get_enumerated_change_description_since(
+        base_branch, workspace_dir)
+    if returncode != 0:
+        return (returncode, None)
+
+    # If no description, use a default
+    if not description:
+        description = "New changelist created by pergit"
+
+    # Create the changelist
+    if dry_run:
+        print(f"Would create new changelist with description:")
+        print(description)
+        return (0, "new")
+
+    # Use p4 change to create a new changelist
+    import subprocess
+
+    # Prepare the changelist spec content
+    spec_content = f"Change: new\n\nDescription:\n\t{description}\n"
+
+    # Create the changelist using subprocess with stdin
+    try:
+        result = subprocess.run(
+            ['p4', 'change', '-i'],
+            cwd=workspace_dir,
+            input=spec_content,
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode != 0:
+            print('Failed to create new changelist', file=sys.stderr)
+            print(result.stderr, file=sys.stderr)
+            return (result.returncode, None)
+
+        # Extract changelist number from output
+        # Format: "Change 12345 created."
+        changelist_number = None
+        for line in result.stdout.splitlines():
+            if 'Change' in line and 'created' in line:
+                match = re.search(r'Change (\d+) created', line)
+                if match:
+                    changelist_number = match.group(1)
+                    break
+
+        if changelist_number is None:
+            print(
+                'Failed to extract changelist number from p4 change output', file=sys.stderr)
+            print('Output:', result.stdout, file=sys.stderr)
+            return (1, None)
+
+        return (0, changelist_number)
+
+    except Exception as e:
+        print(f'Failed to create new changelist: {e}', file=sys.stderr)
+        return (1, None)
+
+
 def edit_command(args):
     """
     Execute the edit command.
@@ -101,6 +174,21 @@ def edit_command(args):
     """
     workspace_dir = ensure_workspace()
 
+    # Handle 'new' changelist creation
+    changelist = args.changelist
+    if args.changelist.lower() == 'new':
+        returncode, changelist = create_new_changelist(
+            args.base_branch, workspace_dir, dry_run=args.dry_run)
+        if returncode != 0:
+            print('Failed to create new changelist', file=sys.stderr)
+            return returncode
+
+        if args.dry_run:
+            print(f"Would use changelist: {changelist}")
+            # For dry run, we still need to continue to show what would be edited
+        else:
+            print(f"Created new changelist: {changelist}")
+
     returncode, changes = get_local_git_changes(
         args.base_branch, workspace_dir)
     if returncode != 0:
@@ -109,7 +197,7 @@ def edit_command(args):
 
     # Process added files
     for filename in changes.adds:
-        res = run(['p4', 'add', '-c', args.changelist, filename],
+        res = run(['p4', 'add', '-c', changelist, filename],
                   cwd=workspace_dir, dry_run=args.dry_run)
         if res.returncode != 0:
             print('Failed to add file to perforce', file=sys.stderr)
@@ -122,23 +210,23 @@ def edit_command(args):
 
         if current_changelist is None:
             # File is not checked out, use p4 edit
-            res = run(['p4', 'edit', '-c', args.changelist, filename],
+            res = run(['p4', 'edit', '-c', changelist, filename],
                       cwd=workspace_dir, dry_run=args.dry_run)
             if res.returncode != 0:
                 print('Failed to open file for edit in perforce', file=sys.stderr)
                 return False
-        elif current_changelist != args.changelist:
+        elif current_changelist != changelist:
             # File is checked out in different changelist, use p4 reopen
-            res = run(['p4', 'reopen', '-c', args.changelist, filename],
+            res = run(['p4', 'reopen', '-c', changelist, filename],
                       cwd=workspace_dir, dry_run=args.dry_run)
             if res.returncode != 0:
                 print('Failed to reopen file in perforce', file=sys.stderr)
                 return False
-        # If current_changelist == args.changelist, file is already in correct changelist, do nothing
+        # If current_changelist == changelist, file is already in correct changelist, do nothing
 
     # Process deleted files
     for filename in changes.dels:
-        res = run(['p4', 'delete', '-c', args.changelist, filename],
+        res = run(['p4', 'delete', '-c', changelist, filename],
                   cwd=workspace_dir, dry_run=args.dry_run)
         if res.returncode != 0:
             print('Failed to delete file from perforce', file=sys.stderr)
@@ -146,12 +234,12 @@ def edit_command(args):
 
     # Process moved/renamed files
     for from_filename, to_filename in changes.moves:
-        res = run(['p4', 'delete', '-c', args.changelist, from_filename],
+        res = run(['p4', 'delete', '-c', changelist, from_filename],
                   cwd=workspace_dir, dry_run=args.dry_run)
         if res.returncode != 0:
             print('Failed to delete from-file in perforce', file=sys.stderr)
             return False
-        res = run(['p4', 'add', '-c', args.changelist, to_filename],
+        res = run(['p4', 'add', '-c', changelist, to_filename],
                   cwd=workspace_dir, dry_run=args.dry_run)
         if res.returncode != 0:
             print('Failed to add file to-file to perforce', file=sys.stderr)
