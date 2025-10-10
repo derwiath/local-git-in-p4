@@ -7,6 +7,7 @@ import sys
 from . import __version__
 from .sync import sync_command
 from .edit import edit_command
+from .list_changes import list_changes_command
 
 
 def create_parser():
@@ -76,6 +77,18 @@ Examples:
         help='Pretend and print all commands, but do not execute'
     )
 
+    # List-changes subcommand
+    list_changes_parser = subparsers.add_parser(
+        'list-changes',
+        help='List commit subjects since base branch',
+        description='List commit subjects since base branch in chronological order (oldest first)'
+    )
+    list_changes_parser.add_argument(
+        '-b', '--base-branch',
+        default='HEAD~1',
+        help='Base branch to compare against. Default is HEAD~1'
+    )
+
     return parser
 
 
@@ -93,6 +106,8 @@ def main():
             return sync_command(args)
         elif args.command == 'edit':
             return edit_command(args)
+        elif args.command == 'list-changes':
+            return list_changes_command(args)
         else:
             print(f'Unknown command: {args.command}', file=sys.stderr)
             return 1
