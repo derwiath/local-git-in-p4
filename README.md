@@ -37,16 +37,13 @@ cd local-git-in-p4
 pip install -e .
 ```
 
-The `-e` flag installs the package in "editable" mode, which means:
-- Changes to the source code are immediately available without reinstalling
-- You can modify the code and test it right away
-- The package is linked to the source directory rather than copied
-
-After installation, you can use `pergit` normally, and any changes you make to the source code will be reflected immediately.
+The `-e` flag installs the package in "editable" mode. Which means that changes
+to the code are immediately available and `pergit` can be tested right
+away without reinstalling.
 
 ### Development Requirements
 
-pergit has no external dependencies and only uses Python standard library modules, so no additional packages are required for development.
+pergit only uses Python standard library modules, no additional packages are required.
 
 ## Setup
 
@@ -59,7 +56,7 @@ p4 sync //...@123
   Take note of the changelist number.
 
 ### Local git repo
-* Initialize a repo somewhere:
+* Initialize a local git repo:
 ```sh
 git init
 ```
@@ -148,8 +145,9 @@ git rebase main
 git add .
 git commit -m "Feature part2"
 
-# Open all edited files on your feature branch for edit in perforce
-pergit edit 126
+# Open all edited files on your feature branch (compared to main) for edit in perforce
+# Store all files in changelist 126
+pergit edit 126 --base-branch main
 
 # Swap over to p4v and submit as CL 126
 
