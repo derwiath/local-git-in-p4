@@ -14,16 +14,16 @@ that help out with the repetitive and error prone stuff.
 Currently, pergit must be installed from source. Clone the repository and install:
 
 ```sh
-git clone https://github.com/derwiath/local-git-in-p4.git
-cd local-git-in-p4
+git clone https://github.com/derwiath/pergit.git
+cd pergit
 pip install .
 ```
 
 Or install in development mode:
 
 ```sh
-git clone https://github.com/derwiath/local-git-in-p4.git
-cd local-git-in-p4
+git clone https://github.com/derwiath/pergit.git
+cd pergit
 pip install -e .
 ```
 
@@ -32,8 +32,8 @@ pip install -e .
 To contribute to pergit or modify it for your needs, you can install it in development mode:
 
 ```sh
-git clone https://github.com/derwiath/local-git-in-p4.git
-cd local-git-in-p4
+git clone https://github.com/derwiath/pergit.git
+cd pergit
 pip install -e .
 ```
 

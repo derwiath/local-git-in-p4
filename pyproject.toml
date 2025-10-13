@@ -31,6 +31,6 @@ classifiers = [
 pergit = "pergit.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/derwiath/local-git-in-p4"
-Repository = "https://github.com/derwiath/local-git-in-p4"
-Issues = "https://github.com/derwiath/local-git-in-p4/issues"
+Homepage = "https://github.com/derwiath/pergit"
+Repository = "https://github.com/derwiath/pergit"
+Issues = "https://github.com/derwiath/pergit/issues"
