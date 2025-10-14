@@ -60,8 +60,9 @@ Examples:
     edit_parser = subparsers.add_parser(
         'edit',
         help='Open local git changes for edit in Perforce',
-        description='Find files that have changed between current git HEAD and '
-        'base branch, and open for edit in p4'
+        description='Find files that have changed and open for edit in p4. '
+        'Finds common ancestor between base-branch and current branch, then opens '
+        'files that changed on base branch but not on current branch.'
     )
     edit_parser.add_argument(
         'changelist',
@@ -70,7 +71,9 @@ Examples:
     edit_parser.add_argument(
         '-b', '--base-branch',
         default='HEAD~1',
-        help='Base branch where p4 and git are in sync. Default is HEAD~1'
+        help='Base branch where p4 and git are in sync. Finds common ancestor with '
+             'current branch and opens files that changed on base branch but not on '
+             'current branch. Default is HEAD~1'
     )
     edit_parser.add_argument(
         '-n', '--dry-run',

@@ -51,9 +51,32 @@ def check_file_status(filename, workspace_dir):
     return None
 
 
+def find_common_ancestor(branch1, branch2, workspace_dir):
+    """
+    Find the common ancestor commit between two branches.
+
+    Args:
+        branch1: First branch name
+        branch2: Second branch name
+        workspace_dir: The git workspace directory
+
+    Returns:
+        Tuple of (returncode, common_ancestor_commit_hash or None)
+    """
+    res = run(['git', 'merge-base', branch1, branch2], cwd=workspace_dir)
+    if res.returncode != 0:
+        return (res.returncode, None)
+    
+    # The output should be a single commit hash
+    if not res.stdout or len(res.stdout) != 1:
+        return (1, None)
+    
+    return (0, res.stdout[0].strip())
+
+
 def get_local_git_changes(base_branch, workspace_dir):
     """
-    Get local git changes between base_branch and HEAD.
+    Get local git changes between base_branch and HEAD using common ancestor logic.
 
     Args:
         base_branch: The base branch to compare against
@@ -62,8 +85,22 @@ def get_local_git_changes(base_branch, workspace_dir):
     Returns:
         Tuple of (returncode, LocalChanges object or None)
     """
-    res = run(['git', 'diff', '--name-status', '{}..HEAD'.format(base_branch)],
+    # Always find common ancestor between base_branch and current HEAD
+    returncode, ancestor = find_common_ancestor(base_branch, 'HEAD', workspace_dir)
+    if returncode != 0:
+        print(f'Failed to find common ancestor between {base_branch} and HEAD', file=sys.stderr)
+        return (returncode, None)
+    
+    if not ancestor:
+        print(f'No common ancestor found between {base_branch} and HEAD. '
+              f'This usually means the branches have completely different histories.', file=sys.stderr)
+        return (1, None)
+    
+    # Diff base_branch against the common ancestor to find files that changed on base_branch
+    # but not on the current branch
+    res = run(['git', 'diff', '--name-status', '{}..{}'.format(ancestor, base_branch)],
               cwd=workspace_dir)
+    
     if res.returncode != 0:
         return (res.returncode, None)
 
@@ -189,8 +226,7 @@ def edit_command(args):
         else:
             print(f"Created new changelist: {changelist}")
 
-    returncode, changes = get_local_git_changes(
-        args.base_branch, workspace_dir)
+    returncode, changes = get_local_git_changes(args.base_branch, workspace_dir)
     if returncode != 0:
         print('Failed to get a list of changed files', file=sys.stderr)
         return returncode
