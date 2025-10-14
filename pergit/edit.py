@@ -237,7 +237,7 @@ def edit_command(args):
                   cwd=workspace_dir, dry_run=args.dry_run)
         if res.returncode != 0:
             print('Failed to add file to perforce', file=sys.stderr)
-            return False
+            return res.returncode
 
     # Process modified files
     for filename in changes.mods:
@@ -250,14 +250,14 @@ def edit_command(args):
                       cwd=workspace_dir, dry_run=args.dry_run)
             if res.returncode != 0:
                 print('Failed to open file for edit in perforce', file=sys.stderr)
-                return False
+                return res.returncode
         elif current_changelist != changelist:
             # File is checked out in different changelist, use p4 reopen
             res = run(['p4', 'reopen', '-c', changelist, filename],
                       cwd=workspace_dir, dry_run=args.dry_run)
             if res.returncode != 0:
                 print('Failed to reopen file in perforce', file=sys.stderr)
-                return False
+                return res.returncode
         # If current_changelist == changelist, file is already in correct changelist, do nothing
 
     # Process deleted files
@@ -266,7 +266,7 @@ def edit_command(args):
                   cwd=workspace_dir, dry_run=args.dry_run)
         if res.returncode != 0:
             print('Failed to delete file from perforce', file=sys.stderr)
-            return False
+            return res.returncode
 
     # Process moved/renamed files
     for from_filename, to_filename in changes.moves:
@@ -274,11 +274,11 @@ def edit_command(args):
                   cwd=workspace_dir, dry_run=args.dry_run)
         if res.returncode != 0:
             print('Failed to delete from-file in perforce', file=sys.stderr)
-            return False
+            return res.returncode
         res = run(['p4', 'add', '-c', changelist, to_filename],
                   cwd=workspace_dir, dry_run=args.dry_run)
         if res.returncode != 0:
             print('Failed to add file to-file to perforce', file=sys.stderr)
-            return False
+            return res.returncode
 
     return 0
