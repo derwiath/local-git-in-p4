@@ -23,6 +23,8 @@ Examples:
   pergit edit 12345          # Open git changes for edit in changelist 12345
   pergit edit new            # Create new changelist and open git changes for edit
   pergit edit 12345 --dry-run # Preview what would be opened for edit
+  pergit list-changes        # List commit subjects since HEAD~1
+  pergit list-changes --base-branch main # List commit subjects since main branch
         """
     )
 

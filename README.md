@@ -73,7 +73,7 @@ git commit -m "Initial commit for CL 123"
 
 ## Usage
 
-pergit provides two main commands: `sync` and `edit`.
+pergit provides three main commands: `sync`, `edit`, and `list-changes`.
 
 ### Sync Command
 
@@ -117,6 +117,25 @@ pergit edit 12345 --base-branch main
 pergit edit 12345 --dry-run
 ```
 
+### List-Changes Command
+
+List commit subjects since a base branch in chronological order (oldest first):
+
+```sh
+pergit list-changes [--base-branch BASE_BRANCH]
+```
+
+**Options:**
+- `-b, --base-branch BASE_BRANCH`: Base branch to compare against. Default is `HEAD~1`.
+
+**Examples:**
+```sh
+pergit list-changes
+pergit list-changes --base-branch main
+```
+
+This command is useful for generating changelist descriptions by listing all commit messages since the base branch, numbered sequentially.
+
 ## Usage Example
 
 Here's a typical workflow using pergit:
@@ -144,6 +163,9 @@ git rebase main
 # Change even more code
 git add .
 git commit -m "Feature part2"
+
+# List all commit messages since main branch (useful for changelist description)
+pergit list-changes --base-branch main
 
 # Open all edited files on your feature branch (compared to main) for edit in perforce
 # Store all files in changelist 126
