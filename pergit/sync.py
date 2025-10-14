@@ -281,11 +281,29 @@ def sync_command(args):
             return 1
         return 0
 
-    args.changelist = int(args.changelist)
+    # Convert changelist string to integer for comparison
+    try:
+        args.changelist = int(args.changelist)
+    except ValueError:
+        print('Invalid changelist number: %s' %
+              args.changelist, file=sys.stderr)
+        return 1
+
     if last_changelist == args.changelist:
         print('Changelist of last commit is %d, nothing to do, aborting '
               % last_changelist)
         return 0
+
+    # Check if trying to sync to an older changelist
+    if last_changelist is not None and args.changelist < last_changelist:
+        if not args.force:
+            print('Cannot sync to older changelist %d (currently at %d) without --force flag'
+                  % (args.changelist, last_changelist))
+            print('Use --force to override this safety check')
+            return 1
+        else:
+            print('Warning: Syncing to older changelist %d (currently at %d) with --force flag'
+                  % (args.changelist, last_changelist))
     print('')
 
     if last_changelist != None:

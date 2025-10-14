@@ -19,7 +19,7 @@ def create_parser():
         epilog="""
 Examples:
   pergit sync 12345          # Sync with changelist 12345
-  pergit sync 12345 --force  # Force sync with writable files
+  pergit sync 12345 --force  # Force sync with writable files and allow older changelists
   pergit edit 12345          # Open git changes for edit in changelist 12345
   pergit edit new            # Create new changelist and open git changes for edit
   pergit edit 12345 --dry-run # Preview what would be opened for edit
@@ -51,9 +51,10 @@ Examples:
     sync_parser.add_argument(
         '-f', '--force',
         action='store_true',
-        help='Force sync encountered writable files. When clobber is not enabled '
-             'on your workspace, p4 will fail to sync files that are read-only. '
-             'git removes the readonly flag on touched files.'
+        help='Force sync encountered writable files and allow syncing to older changelists. '
+             'When clobber is not enabled on your workspace, p4 will fail to sync files that '
+             'are read-only. git removes the readonly flag on touched files. Also allows '
+             'syncing to changelists older than the current one.'
     )
 
     # Edit subcommand
