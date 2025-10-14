@@ -275,7 +275,7 @@ def sync_command(args):
     print('')
 
     last_changelist = git_changelist_of_last_commit(workspace_dir)
-    if args.changelist.lower() == 'head':
+    if args.changelist.lower() == 'last-synced':
         if not p4_sync(last_changelist, args.force, workspace_dir):
             print('Failed to sync files from perforce')
             return 1
