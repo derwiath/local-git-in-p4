@@ -84,7 +84,9 @@ pergit sync <changelist> [--force]
 ```
 
 **Arguments:**
-- `changelist`: Changelist to sync
+- `changelist`: Changelist to sync, or special keywords:
+  - `latest`: Sync to the latest changelist affecting the workspace
+  - `last-synced`: Re-sync the last synced changelist
 
 **Options:**
 - `-f, --force`: Force sync encountered writable files. When clobber is not enabled on your workspace, p4 will fail to sync files that are read-only. git removes the readonly flag on touched files.
@@ -92,6 +94,8 @@ pergit sync <changelist> [--force]
 **Examples:**
 ```sh
 pergit sync 12345
+pergit sync latest
+pergit sync last-synced
 pergit sync 12345 --force
 ```
 
@@ -152,9 +156,9 @@ git checkout -b my-fancy-feature
 git add .
 git commit -m "Feature part1"
 
-# Sync latest from perforce
+# Sync to the latest changelist affecting the workspace
 git checkout main
-pergit sync 125
+pergit sync latest
 
 # Rebase your changes on main
 git checkout my-fancy-feature
@@ -173,9 +177,9 @@ pergit edit 126 --base-branch main
 
 # Swap over to p4v and submit as CL 126
 
-# Sync latest from perforce
+# Sync to the latest changelist from perforce
 git checkout main
-pergit sync 126
+pergit sync latest
 
 # Remove old branch as you don't need it anymore
 git branch -D my-fancy-feature

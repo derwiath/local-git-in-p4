@@ -252,6 +252,48 @@ def git_changelist_of_last_commit(workspace_dir):
         return None
 
 
+def get_latest_changelist_affecting_workspace(workspace_dir):
+    """
+    Get the latest changelist that affects files in the client's workspace view.
+    This finds the most recent changelist that would be pulled by 'p4 sync'.
+
+    Args:
+        workspace_dir: The workspace directory
+
+    Returns:
+        Tuple of (returncode, changelist_number or None)
+    """
+    # First, get the client name
+    res = run(['p4', 'info'], cwd=workspace_dir)
+    if res.returncode != 0:
+        return (res.returncode, None)
+
+    client_name = None
+    for line in res.stdout:
+        if line.startswith('Client name:'):
+            client_name = line.split(':', 1)[1].strip()
+            break
+
+    if not client_name:
+        return (1, None)
+
+    # Get the latest changelist that affects files in the client's workspace view
+    # Using #head to get the latest revisions in the depot that match the client view
+    res = run(['p4', 'changes', '-m1', '-s', 'submitted',
+              f'//{client_name}/...#head'], cwd=workspace_dir)
+    if res.returncode != 0 or len(res.stdout) == 0:
+        return (res.returncode, None)
+
+    # Parse the changelist number from the output
+    # Format is typically: "Change 12345 on 2023/01/01 by user@workspace 'description'"
+    line = res.stdout[0]
+    match = re.search(r'Change (\d+)', line)
+    if match:
+        return (0, int(match.group(1)))
+    else:
+        return (1, None)
+
+
 def sync_command(args):
     """
     Execute the sync command.
@@ -281,13 +323,27 @@ def sync_command(args):
             return 1
         return 0
 
-    # Convert changelist string to integer for comparison
-    try:
-        args.changelist = int(args.changelist)
-    except ValueError:
-        print('Invalid changelist number: %s' %
-              args.changelist, file=sys.stderr)
-        return 1
+    # Handle "latest" keyword
+    if args.changelist.lower() == 'latest':
+        returncode, latest_changelist = get_latest_changelist_affecting_workspace(
+            workspace_dir)
+        if returncode != 0:
+            print('Failed to get latest changelist affecting workspace',
+                  file=sys.stderr)
+            return 1
+        if latest_changelist is None:
+            print('No changelists found affecting workspace', file=sys.stderr)
+            return 1
+        print(f'Latest changelist affecting workspace: {latest_changelist}')
+        args.changelist = latest_changelist
+    else:
+        # Convert changelist string to integer for comparison
+        try:
+            args.changelist = int(args.changelist)
+        except ValueError:
+            print('Invalid changelist number: %s' %
+                  args.changelist, file=sys.stderr)
+            return 1
 
     if last_changelist == args.changelist:
         print('Changelist of last commit is %d, nothing to do, aborting '

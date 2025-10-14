@@ -19,6 +19,8 @@ def create_parser():
         epilog="""
 Examples:
   pergit sync 12345          # Sync with changelist 12345
+  pergit sync latest         # Sync with the latest changelist affecting the workspace
+  pergit sync last-synced    # Re-sync the last synced changelist
   pergit sync 12345 --force  # Force sync with writable files and allow older changelists
   pergit edit 12345          # Open git changes for edit in changelist 12345
   pergit edit new            # Create new changelist and open git changes for edit
@@ -48,7 +50,7 @@ Examples:
     )
     sync_parser.add_argument(
         'changelist',
-        help='Changelist to sync'
+        help='Changelist to sync, "latest" to sync to the latest changelist affecting the workspace, or "last-synced" to re-sync the last synced changelist'
     )
     sync_parser.add_argument(
         '-f', '--force',
