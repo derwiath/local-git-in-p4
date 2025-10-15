@@ -8,6 +8,7 @@ from . import __version__
 from .sync import sync_command
 from .edit import edit_command
 from .list_changes import list_changes_command
+from .review import review_new_command, review_update_command
 
 
 def create_parser():
@@ -27,6 +28,8 @@ Examples:
   pergit edit 12345 --dry-run # Preview what would be opened for edit
   pergit list-changes        # List commit subjects since HEAD~1
   pergit list-changes --base-branch main # List commit subjects since main branch
+  pergit review new          # Create new changelist and Swarm review
+  pergit review update 12345 # Update existing changelist and Swarm review
         """
     )
 
@@ -98,6 +101,60 @@ Examples:
         help='Base branch to compare against. Default is HEAD~1'
     )
 
+    # Review subcommand
+    review_parser = subparsers.add_parser(
+        'review',
+        help='Create or update Swarm reviews',
+        description='Create new Swarm reviews or update existing ones with git changes'
+    )
+    review_subparsers = review_parser.add_subparsers(
+        dest='review_command',
+        help='Review subcommands',
+        metavar='COMMAND'
+    )
+
+    # Review new subcommand
+    review_new_parser = review_subparsers.add_parser(
+        'new',
+        help='Create new changelist and Swarm review',
+        description='Create a new changelist with changes since base branch and create a Swarm review'
+    )
+    review_new_parser.add_argument(
+        '-b', '--base-branch',
+        default='HEAD~1',
+        help='Base branch where p4 and git are in sync. Finds common ancestor with '
+             'current branch and includes files that changed on base branch but not on '
+             'current branch. Default is HEAD~1'
+    )
+    review_new_parser.add_argument(
+        '-n', '--dry-run',
+        action='store_true',
+        help='Pretend and print all commands, but do not execute'
+    )
+
+    # Review update subcommand
+    review_update_parser = review_subparsers.add_parser(
+        'update',
+        help='Update existing changelist and Swarm review',
+        description='Update an existing changelist with changes since base branch and update the Swarm review'
+    )
+    review_update_parser.add_argument(
+        'changelist',
+        help='Changelist number to update'
+    )
+    review_update_parser.add_argument(
+        '-b', '--base-branch',
+        default='HEAD~1',
+        help='Base branch where p4 and git are in sync. Finds common ancestor with '
+             'current branch and includes files that changed on base branch but not on '
+             'current branch. Default is HEAD~1'
+    )
+    review_update_parser.add_argument(
+        '-n', '--dry-run',
+        action='store_true',
+        help='Pretend and print all commands, but do not execute'
+    )
+
     return parser
 
 
@@ -117,6 +174,19 @@ def main():
             return edit_command(args)
         elif args.command == 'list-changes':
             return list_changes_command(args)
+        elif args.command == 'review':
+            if not hasattr(args, 'review_command') or not args.review_command:
+                print(
+                    'Error: review command requires a subcommand (new or update)', file=sys.stderr)
+                return 1
+            elif args.review_command == 'new':
+                return review_new_command(args)
+            elif args.review_command == 'update':
+                return review_update_command(args)
+            else:
+                print(
+                    f'Unknown review subcommand: {args.review_command}', file=sys.stderr)
+                return 1
         else:
             print(f'Unknown command: {args.command}', file=sys.stderr)
             return 1
