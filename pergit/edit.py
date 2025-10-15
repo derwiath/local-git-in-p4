@@ -100,7 +100,7 @@ def get_local_git_changes(base_branch, workspace_dir):
 
     # Diff base_branch against the common ancestor to find files that changed on base_branch
     # but not on the current branch
-    res = run(['git', 'diff', '--name-status', '{}..{}'.format(ancestor, base_branch)],
+    res = run(['git', 'diff', '--name-status', '{}..{}'.format('HEAD', ancestor)],
               cwd=workspace_dir)
 
     if res.returncode != 0:
