@@ -4,6 +4,7 @@ Edit command implementation for pergit.
 
 import re
 import sys
+import subprocess
 from .common import ensure_workspace, run
 from .list_changes import get_enumerated_change_description_since
 
@@ -157,13 +158,10 @@ def create_new_changelist(base_branch, workspace_dir, dry_run=False):
         print(description)
         return (0, "new")
 
-    # Use p4 change to create a new changelist
-    import subprocess
-
     # Prepare the changelist spec content
     spec_content = f"Change: new\n\nDescription:\n\t{description}\n"
 
-    # Create the changelist using subprocess with stdin
+    # Create the changelist using p4 change, pass description via stdin
     try:
         result = subprocess.run(
             ['p4', 'change', '-i'],
