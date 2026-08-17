@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1
+
+- Add support for $(workspace) placeholder in the depot root that resolves to current workspace for folder
+- Add pre-sync hooks that can abort a sync
+- Sync multiple changelists in sequence, one commit each
+- Add explicit "head" keyword to sync for the latest changelist
+
 ## Unreleased
 
 - The depot root in `config.toml` may use a `$(workspace)` placeholder (e.g. `root = "//$(workspace)/Engine"`),
