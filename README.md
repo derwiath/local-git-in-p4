@@ -312,7 +312,10 @@ own submits one at a time. Repeat `--user` to split out several people's changel
 It is equivalent to working out the numbers by hand and running
 `git p4son sync <before-theirs> <theirs> ... head`, and it delegates to `sync` once the sequence is
 resolved, so [pre-sync and post-sync hooks](#hooks), writable-file merging, and the clean-workspace checks
-all behave exactly as they do for `sync`.
+all behave exactly as they do for `sync`. The clean-workspace checks and the pre-sync hooks are the one
+thing that runs earlier: resolving the sequence costs several Perforce queries, so they go first, and a
+dirty workspace or a hook that aborts the sync says so before that work. They run once for the whole sync,
+and not at all for a `--dry-run` or when there is nothing to sync.
 
 **Arguments:**
 - `changelist` (optional): Changelist number to sync up to, or `head` for the latest. Omit to sync to the

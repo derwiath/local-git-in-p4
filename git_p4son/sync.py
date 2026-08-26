@@ -36,6 +36,9 @@ from .perforce import (
 )
 
 
+LAST_SYNCED_LABEL = 'last synced'
+
+
 @dataclass
 class LastSync:
     """Info about the most recent p4son sync commit."""
@@ -524,17 +527,76 @@ def _handle_clobber_warning(clobber: bool, workspace_dir: str) -> bool:
     return True
 
 
+def _check_git_workspace_clean(workspace_dir: str) -> bool:
+    """Report whether the git workspace has no uncommitted changes."""
+    log.heading('Checking git workspace')
+    dirty_files = get_dirty_files(workspace_dir)
+    if dirty_files:
+        for filename, change in dirty_files:
+            log.file_change(filename, change)
+        log.error('Workspace is not clean')
+        return False
+    log.success('clean')
+    return True
+
+
+def _check_p4_workspace_clean(depot_root: str, workspace_dir: str) -> bool:
+    """Report whether the p4 workspace has no git-tracked files opened.
+
+    Files opened in Perforce that git does not track cannot collide with the
+    commit a sync makes, so they only warrant a warning.
+    """
+    log.heading('Checking p4 workspace')
+    opened_files = p4_get_opened_files(depot_root, workspace_dir)
+    tracked_opened_files = [
+        (filename, change)
+        for filename, change in opened_files
+        if is_file_tracked(filename, workspace_dir)
+    ]
+    if tracked_opened_files:
+        for filename, change in tracked_opened_files:
+            log.file_change(filename, change)
+        log.error('Workspace has p4-opened files tracked by git')
+        return False
+    if opened_files:
+        log.warning(
+            f'Ignoring {len(opened_files)} p4-opened files not tracked by git')
+    else:
+        log.success('Clean')
+    return True
+
+
 def _run_pre_sync_hooks(workspace_dir: str, invocation_dir: str) -> bool:
     """Run pre-sync hooks; return False when any hook fails, aborting the sync.
 
-    Runs once before any changelist is synced. All hooks run (they are
-    independent), then the sync is aborted if any returned a non-zero code.
+    All hooks run (they are independent), then the sync is aborted if any
+    returned a non-zero code.
     """
     results = run_hooks('pre-sync', workspace_dir, invocation_dir)
     if any(result.returncode != 0 for result in results):
         log.error('Aborting sync because a pre-sync hook failed')
         return False
     return True
+
+
+def sync_preflight(depot_root: str, workspace_dir: str, invocation_dir: str,
+                   already_done: bool = False) -> bool:
+    """Gate a sync: both workspaces clean, then the pre-sync hooks.
+
+    Returns False when the sync must not go ahead. Callers run this once they
+    know a sync will actually be attempted, so that a run with nothing to sync
+    neither checks the workspaces nor fires the hooks. already_done covers a
+    caller that ran it before delegating here: sync-split runs it up front,
+    ahead of the p4 queries that resolve its changelist sequence, so neither
+    the checks nor the hooks happen twice.
+    """
+    if already_done:
+        return True
+    if not _check_git_workspace_clean(workspace_dir):
+        return False
+    if not _check_p4_workspace_clean(depot_root, workspace_dir):
+        return False
+    return _run_pre_sync_hooks(workspace_dir, invocation_dir)
 
 
 def _sync_pass(changelist: int, label: str, depot_root: str,
@@ -587,10 +649,82 @@ def resolve_depot_root(workspace_dir: str) -> ResolvedDepot | None:
     return ResolvedDepot(depot_root=depot_root, client_spec=client_spec)
 
 
+def _latest_target(depot_root: str, workspace_dir: str) -> tuple[int, str]:
+    """Look up the latest submitted changelist as a sync target."""
+    log.heading('Finding latest changelist')
+    latest = get_latest_changelist(depot_root, workspace_dir)
+    log.success(f'CL {latest}')
+    return (latest, 'latest')
+
+
+def _resolve_sync_targets(
+        raw: list[str], last_sync: LastSync | None, depot_root: str,
+        workspace_dir: str, force: bool) -> list[tuple[int, str]] | None:
+    """Resolve the ordered (changelist, label) targets a sync will visit.
+
+    Returns None when the arguments are invalid, and an empty list when the
+    workspace already sits at the only changelist asked for.
+    """
+    lowered = [c.lower() for c in raw]
+
+    # "head" resolves to the latest changelist, the largest in an increasing
+    # sequence, so it may only appear as the final target.
+    if 'head' in lowered and lowered.index('head') != len(lowered) - 1:
+        log.error('The "head" keyword must come last')
+        return None
+
+    if not raw:
+        targets = [_latest_target(depot_root, workspace_dir)]
+    else:
+        targets = []
+        for c in raw:
+            if c.lower() == 'head':
+                targets.append(_latest_target(depot_root, workspace_dir))
+            else:
+                try:
+                    targets.append((int(c), 'specified'))
+                except ValueError:
+                    log.error(f'Invalid changelist number: {c}')
+                    return None
+
+    # Targets are synced in the given order, so they must be strictly
+    # increasing: no syncing back and forth.
+    numbers = [cl for cl, _ in targets]
+    for prev, curr in zip(numbers, numbers[1:]):
+        if curr <= prev:
+            log.error('Changelists must be strictly increasing, '
+                      f'got {prev} then {curr}')
+            return None
+
+    # Syncing to a changelist older than the current one needs --force.
+    # Targets are strictly increasing, so the smallest is numbers[0]; an
+    # equal-to-current changelist (dropped just below) is not "older".
+    if last_sync and numbers[0] < last_sync.changelist:
+        if not force:
+            log.error(
+                f'Cannot sync to CL {numbers[0]} '
+                f'(currently at CL {last_sync.changelist}) without --force.')
+            return None
+        log.warning(
+            f'Syncing to older CL {numbers[0]} '
+            f'(currently at CL {last_sync.changelist}) with --force')
+
+    # Drop a target equal to the last synced changelist: we are already
+    # there, so there is nothing to sync or commit for it. An explicitly
+    # requested *older* changelist is kept and synced as the user asked.
+    if last_sync and last_sync.changelist in numbers:
+        log.info(f'Skipping CL {last_sync.changelist} (already synced)')
+        targets = [(cl, lbl) for cl, lbl in targets
+                   if cl != last_sync.changelist]
+
+    return targets
+
+
 def sync_command(args: argparse.Namespace) -> int:
     """Execute the sync command."""
     workspace_dir = args.workspace_dir
     invocation_dir = vars(args).get('invocation_dir', workspace_dir)
+    preflight_done = vars(args).get('preflight_done', False)
 
     resolved = resolve_depot_root(workspace_dir)
     if resolved is None:
@@ -598,44 +732,40 @@ def sync_command(args: argparse.Namespace) -> int:
     depot_root = resolved.depot_root
     client_spec = resolved.client_spec
 
-    log.heading('Checking git workspace')
-    dirty_files = get_dirty_files(workspace_dir)
-    if dirty_files:
-        for filename, change in dirty_files:
-            log.file_change(filename, change)
-        log.error('Workspace is not clean')
-        return 1
-    log.success('clean')
-
-    log.heading('Checking p4 workspace')
-    opened_files = p4_get_opened_files(depot_root, workspace_dir)
-    tracked_opened_files = [
-        (filename, change)
-        for filename, change in opened_files
-        if is_file_tracked(filename, workspace_dir)
-    ]
-    if tracked_opened_files:
-        for filename, change in tracked_opened_files:
-            log.file_change(filename, change)
-        log.error('Workspace has p4-opened files tracked by git')
-        return 1
-    if opened_files:
-        log.warning(
-            f'Ignoring {len(opened_files)} p4-opened files not tracked by git')
-    else:
-        log.success('Clean')
-
-    last_changelist_label = 'last synced'
-    log.heading(f'Finding {last_changelist_label} changelist')
+    log.heading(f'Finding {LAST_SYNCED_LABEL} changelist')
     last_sync = git_last_sync(workspace_dir)
     if last_sync:
         log.success(f'CL {last_sync.changelist}')
     else:
         log.warning('No previous sync found')
 
-    log.heading('Finding HEAD commit')
-    pre_sync_head_commit = get_head_commit(workspace_dir)
-    log.success(f'{pre_sync_head_commit}')
+    # Work out what the sync will do before touching either workspace, so a
+    # run with nothing to sync gets through without checks or hooks.
+    lowered = [c.lower() for c in args.changelist]
+
+    # "last-synced" is a keyword that only makes sense on its own. It re-syncs
+    # the changelist git is already at rather than advancing, so it resolves
+    # to no targets and takes its own path further down.
+    resync_last_synced = 'last-synced' in lowered
+    targets: list[tuple[int, str]] = []
+    if resync_last_synced:
+        if lowered != ['last-synced']:
+            log.error('The "last-synced" keyword cannot be combined with '
+                      'other changelists')
+            return 1
+        if not last_sync:
+            log.error('No previous sync found, cannot use "last-synced"')
+            return 1
+    else:
+        resolved_targets = _resolve_sync_targets(
+            args.changelist, last_sync, depot_root, workspace_dir, args.force)
+        if resolved_targets is None:
+            return 1
+        if not resolved_targets:
+            log.info('Already synced, nothing to do.')
+            log.heading('Skipping post-sync hooks')
+            return 0
+        targets = resolved_targets
 
     # Workspace line ending governs how staged git content is normalized so
     # the post-sync merge doesn't conflict on LF-vs-CRLF differences alone.
@@ -645,112 +775,42 @@ def sync_command(args: argparse.Namespace) -> int:
     uses_crlf = bool(client_spec and client_spec.uses_crlf)
     clobber = bool(client_spec and client_spec.clobber)
 
+    # Prompted before the preflight so declining here costs nothing: no
+    # workspace queries, and no hooks fired for a sync that is abandoned.
     if not _handle_clobber_warning(clobber, workspace_dir):
         return 1
+
+    # The single gate: both workspaces clean, then the pre-sync hooks. Runs
+    # once for the whole sync, covering the catch-up pass as well, and is
+    # skipped outright when the caller (sync-split) already ran it.
+    if not sync_preflight(depot_root, workspace_dir, invocation_dir,
+                          preflight_done):
+        return 1
+
+    log.heading('Finding HEAD commit')
+    pre_sync_head_commit = get_head_commit(workspace_dir)
+    log.success(f'{pre_sync_head_commit}')
 
     # Temp root for staging HEAD/baseline file content between classification
     # and the post-sync merge. Cleaned up automatically on exit.
     with tempfile.TemporaryDirectory(prefix='git-p4son-sync-') as temp_root:
-        raw = args.changelist
-        lowered = [c.lower() for c in raw]
-
-        # "last-synced" is a keyword that only makes sense on its own.
-        if 'last-synced' in lowered:
-            if lowered != ['last-synced']:
-                log.error('The "last-synced" keyword cannot be combined with '
-                          'other changelists')
-                return 1
-            if not last_sync:
-                log.error('No previous sync found, cannot use "last-synced"')
-                return 1
-            if not _run_pre_sync_hooks(workspace_dir, invocation_dir):
-                return 1
-            _sync_pass(last_sync.changelist, last_changelist_label, depot_root,
+        if resync_last_synced:
+            _sync_pass(last_sync.changelist, LAST_SYNCED_LABEL, depot_root,
                        workspace_dir, pre_sync_head_commit, temp_root,
                        uses_crlf, clobber)
             run_hooks('post-sync', workspace_dir, invocation_dir)
             return 0
 
-        # "head" resolves to the latest changelist, the largest in an
-        # increasing sequence, so it may only appear as the final target.
-        if 'head' in lowered and lowered.index('head') != len(lowered) - 1:
-            log.error('The "head" keyword must come last')
-            return 1
-
-        # Resolve the ordered list of (changelist, label) targets to sync,
-        # replacing a trailing "head" with the concrete latest changelist so
-        # the increasing-order check below compares real numbers.
-        if not raw:
-            log.heading('Finding latest changelist')
-            latest = get_latest_changelist(depot_root, workspace_dir)
-            log.success(f'CL {latest}')
-            targets = [(latest, 'latest')]
-        else:
-            targets = []
-            for c in raw:
-                if c.lower() == 'head':
-                    log.heading('Finding latest changelist')
-                    latest = get_latest_changelist(depot_root, workspace_dir)
-                    log.success(f'CL {latest}')
-                    targets.append((latest, 'latest'))
-                else:
-                    try:
-                        targets.append((int(c), 'specified'))
-                    except ValueError:
-                        log.error(f'Invalid changelist number: {c}')
-                        return 1
-
-        # Targets are synced in the given order, so they must be strictly
-        # increasing: no syncing back and forth.
-        numbers = [cl for cl, _ in targets]
-        for prev, curr in zip(numbers, numbers[1:]):
-            if curr <= prev:
-                log.error('Changelists must be strictly increasing, '
-                          f'got {prev} then {curr}')
-                return 1
-
-        last_changelist = last_sync.changelist if last_sync else None
-
-        # Syncing to a changelist older than the current one needs --force.
-        # Targets are strictly increasing, so the smallest is numbers[0]; an
-        # equal-to-current changelist (dropped just below) is not "older".
-        if last_sync and numbers[0] < last_sync.changelist:
-            if not args.force:
-                log.error(
-                    f'Cannot sync to CL {numbers[0]} '
-                    f'(currently at CL {last_sync.changelist}) without --force.')
-                return 1
-            log.warning(
-                f'Syncing to older CL {numbers[0]} '
-                f'(currently at CL {last_sync.changelist}) with --force')
-
-        # Drop a target equal to the last synced changelist: we are already
-        # there, so there is nothing to sync or commit for it. An explicitly
-        # requested *older* changelist is kept and synced as the user asked.
-        if last_changelist is not None and last_changelist in numbers:
-            log.info(f'Skipping CL {last_changelist} (already synced)')
-            targets = [(cl, lbl) for cl, lbl in targets
-                       if cl != last_changelist]
-
-        if not targets:
-            log.info('Already synced, nothing to do.')
-            log.heading('Skipping post-sync hooks')
-            return 0
-
-        # Pre-sync hooks run once, before syncing any changelist (including the
-        # catch-up pass), and abort the whole sync if any of them fail.
-        if not _run_pre_sync_hooks(workspace_dir, invocation_dir):
-            return 1
-
         all_changed: list[ChangedFile] = []
         all_ignored: list[str] = []
+        last_changelist = last_sync.changelist if last_sync else None
 
         # Catch-up pass to the last synced changelist. This makes locally
         # modified (writable) files read-only and stages their content so the
         # post-sync merge can restore local changes; its result is folded into
         # the first target commit.
         if last_changelist is not None:
-            prep = _sync_pass(last_changelist, last_changelist_label,
+            prep = _sync_pass(last_changelist, LAST_SYNCED_LABEL,
                               depot_root, workspace_dir, pre_sync_head_commit,
                               temp_root, uses_crlf, clobber)
             all_changed.extend(prep.changed)

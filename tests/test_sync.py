@@ -866,21 +866,23 @@ class TestSyncCommand(unittest.TestCase):
         rc = sync_command(args)
         self.assertEqual(rc, 1)
 
+    @mock.patch('git_p4son.sync.git_last_sync', return_value=None)
     @mock.patch('git_p4son.sync.get_dirty_files',
                 return_value=[('file.txt', 'modify')])
     @mock.patch('git_p4son.sync.get_depot_root', return_value='//myclient')
-    def test_dirty_git_workspace_aborts(self, _depot, _git_clean):
+    def test_dirty_git_workspace_aborts(self, _depot, _git_clean, _last_sync):
         args = mock.Mock(changelist=['100'], force=False, workspace_dir='/ws')
         rc = sync_command(args)
         self.assertEqual(rc, 1)
 
+    @mock.patch('git_p4son.sync.git_last_sync', return_value=None)
     @mock.patch('git_p4son.sync.is_file_tracked', return_value=True)
     @mock.patch('git_p4son.sync.get_dirty_files', return_value=[])
     @mock.patch('git_p4son.sync.p4_get_opened_files',
                 return_value=[('foo.txt', 'modify')])
     @mock.patch('git_p4son.sync.get_depot_root', return_value='//myclient')
     def test_dirty_p4_workspace_aborts(self, _depot, _p4clean, _git_clean,
-                                       _tracked):
+                                       _tracked, _last_sync):
         args = mock.Mock(changelist=['100'], force=False, workspace_dir='/ws')
         rc = sync_command(args)
         self.assertEqual(rc, 1)
@@ -943,12 +945,13 @@ class TestSyncCommand(unittest.TestCase):
 
     @mock.patch('git_p4son.sync._handle_clobber_warning', return_value=False)
     @mock.patch('git_p4son.sync.get_head_commit', return_value='def456')
+    @mock.patch('git_p4son.sync.get_latest_changelist', return_value=200)
     @mock.patch('git_p4son.sync.git_last_sync', return_value=None)
     @mock.patch('git_p4son.sync.p4_get_opened_files', return_value=[])
     @mock.patch('git_p4son.sync.get_dirty_files', return_value=[])
     @mock.patch('git_p4son.sync.get_depot_root', return_value='//myclient')
     def test_aborts_when_clobber_warning_declined(
-            self, _depot, _git_clean, _p4clean, _last_sync, _head,
+            self, _depot, _git_clean, _p4clean, _last_sync, _latest, _head,
             _warn):
         args = mock.Mock(changelist=[], force=False, workspace_dir='/ws')
         rc = sync_command(args)
@@ -961,12 +964,16 @@ class TestSyncCommand(unittest.TestCase):
     @mock.patch('git_p4son.sync.p4_get_opened_files', return_value=[])
     @mock.patch('git_p4son.sync.get_dirty_files', return_value=[])
     @mock.patch('git_p4son.sync.get_depot_root', return_value='//myclient')
-    def test_same_cl_is_noop(self, _depot, _git_clean, _p4clean,
+    def test_same_cl_is_noop(self, _depot, mock_git_clean, mock_p4clean,
                              mock_last_sync, _head, mock_run_hooks, mock_log):
         mock_last_sync.return_value = LastSync(changelist=100, commit='abc')
         args = mock.Mock(changelist=['100'], force=False, workspace_dir='/ws')
         rc = sync_command(args)
         self.assertEqual(rc, 0)
+        # Nothing to sync, so the whole preflight is skipped: no workspace
+        # queries and no hooks, not merely no hooks.
+        mock_git_clean.assert_not_called()
+        mock_p4clean.assert_not_called()
         mock_run_hooks.assert_not_called()
         mock_log.heading.assert_any_call('Skipping post-sync hooks')
 

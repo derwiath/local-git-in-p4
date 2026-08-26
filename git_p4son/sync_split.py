@@ -11,7 +11,9 @@ from .perforce import (
     get_p4_user,
     get_submitted_changes,
 )
-from .sync import git_last_sync, resolve_depot_root, sync_command
+from .sync import (
+    git_last_sync, resolve_depot_root, sync_command, sync_preflight,
+)
 
 
 def build_sync_targets(changes: list[P4Change], users: list[str],
@@ -70,6 +72,7 @@ def _resolve_users(args: argparse.Namespace, workspace_dir: str) -> list[str]:
 def sync_split_command(args: argparse.Namespace) -> int:
     """Execute the sync-split command."""
     workspace_dir = args.workspace_dir
+    invocation_dir = vars(args).get('invocation_dir', workspace_dir)
 
     resolved = resolve_depot_root(workspace_dir)
     if resolved is None:
@@ -107,6 +110,17 @@ def sync_split_command(args: argparse.Namespace) -> int:
                   'Use "git p4son sync --force" to sync to an older '
                   'changelist.')
         return 1
+
+    # The workspace checks and pre-sync hooks run here rather than being left
+    # to sync_command, which only reaches them after all of the resolution
+    # below. That resolution costs several p4 round trips, so a dirty
+    # workspace or a hook vetoing the sync should get to say so first.
+    # sync_command is told it is done so none of it happens twice, and a dry
+    # run syncs nothing, so it skips the gate entirely.
+    if not args.dry_run:
+        if not sync_preflight(depot_root, workspace_dir, invocation_dir):
+            return 1
+        args.preflight_done = True
 
     users = _resolve_users(args, workspace_dir)
     if not users:
