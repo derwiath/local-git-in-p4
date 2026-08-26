@@ -2,10 +2,11 @@
 
 ## Unreleased
 
+## 0.3.3
+
 - `sync-split` now checks that the git and Perforce workspaces are clean and runs the `pre-sync` hooks
-  before it queries Perforce for the changelists to sync, instead of afterwards. A dirty workspace, or a
-  hook that stops the sync because the Unreal editor is open, now aborts the command straight away rather
-  than after a wait for several Perforce queries
+  before it queries Perforce for the changelists to sync, instead of afterwards.
+- Document how to create symlink in Powershell for example hooks
 
 ## 0.3.2
 
