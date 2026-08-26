@@ -616,11 +616,24 @@ clone, so no `chmod` is needed.
 #### block-while-running (pre-sync)
 
 Aborts the sync while a named process is running, so a sync cannot swap out assets that a running editor still
-has loaded:
+has loaded. Link it into your workspace's `pre-sync` hook directory - on macOS and Linux:
 
 ```sh
 ln -s /path/to/git-p4son/examples/hooks/pre-sync/block-while-running.py .git-p4son/hooks/pre-sync/
 ```
+
+On Windows, from PowerShell. Note that `-Path` is the link to create and `-Target` the existing file, the
+reverse of the `ln -s` argument order, and that `-Target` should be absolute: a relative path is resolved
+against the current directory and quietly produces a broken link.
+
+```powershell
+New-Item -ItemType SymbolicLink `
+  -Path   "C:\p4\my-workspace\.git-p4son\hooks\pre-sync\block-while-running.py" `
+  -Target "C:\src\git-p4son\examples\hooks\pre-sync\block-while-running.py"
+```
+
+Creating a symlink on Windows needs either an elevated shell or Developer Mode enabled (Settings > System >
+For developers). Without one of those, copy the file instead and re-copy it whenever the clone updates.
 
 Which processes block a sync is read from your workspace's own `.git-p4son/config.toml`, so a symlinked hook
 stays per-project:
