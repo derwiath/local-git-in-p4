@@ -606,6 +606,36 @@ before the first sync.
 After a successful `git-p4son sync` that actually performs sync work, git-p4son runs executable hooks from
 `.git-p4son/hooks/post-sync/`.
 
+### Example hooks
+
+The [`examples/hooks/`](examples/hooks/) directory holds ready-made hooks. Nothing installs them for you:
+symlink or copy the one you want into the matching hook directory in your workspace. Symlinking keeps the hook
+up to date with the clone it points at, and on macOS and Linux the executable bit comes from the file in the
+clone, so no `chmod` is needed.
+
+#### block-while-running (pre-sync)
+
+Aborts the sync while a named process is running, so a sync cannot swap out assets that a running editor still
+has loaded:
+
+```sh
+ln -s /path/to/git-p4son/examples/hooks/pre-sync/block-while-running.py .git-p4son/hooks/pre-sync/
+```
+
+Which processes block a sync is read from your workspace's own `.git-p4son/config.toml`, so a symlinked hook
+stays per-project:
+
+```toml
+[hooks.block-while-running]
+processes = ["UnrealEditor", "UnrealLightmass"]
+```
+
+Names are matched with any `.exe` suffix stripped and case ignored, so a single entry covers
+`UnrealEditor.exe` on Windows and `UnrealEditor` on macOS. Without that table the hook checks nothing and the
+sync proceeds; a table that is present but malformed aborts the sync rather than silently skipping the check.
+
+Set `GIT_P4SON_SKIP_PROCESS_CHECK=1` to run one sync without the check.
+
 ## Shell Completions
 
 Tab completion is available for bash, zsh, and PowerShell, including commands, flags, and dynamic alias names.
