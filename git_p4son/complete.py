@@ -117,6 +117,10 @@ def _complete_positional(command, subcommand, positional_count,
         return _filter(
             [('head', 'Sync to the latest changelist')], prefix)
 
+    if command == 'sync-split' and positional_count == 0:
+        return _filter(
+            [('head', 'Sync to the latest changelist')], prefix)
+
     if command == 'update' and positional_count == 0:
         branch_candidates = _get_branch_candidates(prefix, workspace_dir)
         return branch_candidates + _filter(aliases, prefix)

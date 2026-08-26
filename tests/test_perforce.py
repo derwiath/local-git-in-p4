@@ -5,8 +5,9 @@ from unittest import mock
 
 from git_p4son.perforce import (
     P4ClientSpec, P4FileInfo, P4SyncPreviewFile, get_client_spec,
-    is_binary_file_type, p4_fstat_file_info, p4_sync_preview,
-    parse_ztag_multi_output, parse_ztag_output,
+    get_p4_user, get_submitted_changes, is_binary_file_type,
+    p4_fstat_file_info, p4_sync_preview, parse_ztag_multi_output,
+    parse_ztag_output,
 )
 from tests.helpers import make_run_result
 
@@ -253,3 +254,48 @@ class TestGetClientSpec(unittest.TestCase):
         ])
         spec = get_client_spec('/ws')
         self.assertIsNone(spec)
+
+
+class TestGetSubmittedChanges(unittest.TestCase):
+    @mock.patch('git_p4son.perforce.run')
+    def test_parses_and_sorts_changes(self, mock_run):
+        # p4 lists newest first; the sequence builder needs oldest first.
+        mock_run.return_value = make_run_result(stdout=[
+            '... change 105',
+            '... user andreas',
+            '... desc Fix the thing',
+            '',
+            '... change 102',
+            '... user colleague',
+            '... desc Some other work',
+            '',
+        ])
+        changes = get_submitted_changes('//myclient', 100, 105, '/ws')
+        self.assertEqual([(c.change, c.user) for c in changes],
+                         [(102, 'colleague'), (105, 'andreas')])
+        mock_run.assert_called_once_with(
+            ['p4', '-ztag', 'changes', '-s', 'submitted',
+             '//myclient/...@100,@105'], cwd='/ws')
+
+    @mock.patch('git_p4son.perforce.run')
+    def test_no_changes_in_range(self, mock_run):
+        mock_run.return_value = make_run_result(stdout=[])
+        self.assertEqual(get_submitted_changes('//myclient', 100, 105, '/ws'),
+                         [])
+
+
+class TestGetP4User(unittest.TestCase):
+    @mock.patch('git_p4son.perforce.run')
+    def test_reads_user_name(self, mock_run):
+        mock_run.return_value = make_run_result(stdout=[
+            '... userName andreas',
+            '... clientName my-ws',
+        ])
+        self.assertEqual(get_p4_user('/ws'), 'andreas')
+        mock_run.assert_called_once_with(
+            ['p4', '-ztag', 'info'], cwd='/ws')
+
+    @mock.patch('git_p4son.perforce.run')
+    def test_missing_user_name(self, mock_run):
+        mock_run.return_value = make_run_result(stdout=['... clientName x'])
+        self.assertIsNone(get_p4_user('/ws'))

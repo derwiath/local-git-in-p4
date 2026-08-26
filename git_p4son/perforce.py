@@ -204,6 +204,33 @@ def get_latest_changelist(depot_root: str, workspace_dir: str) -> int:
     return int(fields['change'])
 
 
+@dataclass
+class P4Change:
+    """A submitted changelist affecting the depot root."""
+
+    change: int
+    user: str
+
+
+def get_submitted_changes(depot_root: str, start: int, end: int,
+                          workspace_dir: str) -> list[P4Change]:
+    """List changelists submitted to the depot root in [start, end], oldest first."""
+    res = run(['p4', '-ztag', 'changes', '-s', 'submitted',
+               f'{depot_root}/...@{start},@{end}'], cwd=workspace_dir)
+    records = parse_ztag_multi_output(res.stdout)
+    changes = [P4Change(change=int(r['change']), user=r.get('user', ''))
+               for r in records if 'change' in r]
+    return sorted(changes, key=lambda c: c.change)
+
+
+def get_p4_user(workspace_dir: str) -> str | None:
+    """Get the Perforce user name of the current connection."""
+    res = run(['p4', '-ztag', 'info'], cwd=workspace_dir)
+    fields = parse_ztag_output(res.stdout)
+    user = fields.get('userName')
+    return user or None
+
+
 # --- file operations ---
 
 def get_changelist_for_file(filename: str, workspace_dir: str) -> tuple[str, str] | None:

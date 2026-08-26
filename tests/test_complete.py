@@ -136,7 +136,8 @@ class TestComplete(unittest.TestCase):
         self.assertIn('alias', names)
         self.assertIn('review', names)
         self.assertIn('init', names)
-        self.assertEqual(len(names), 7)
+        self.assertIn('sync-split', names)
+        self.assertEqual(len(names), 8)
 
     def test_empty_excludes_complete(self, _ws, _aliases):
         result = _complete(self.parser, [''], workspace_dir='/ws')
@@ -151,7 +152,7 @@ class TestComplete(unittest.TestCase):
     def test_prefix_filters_commands(self, _ws, _aliases):
         result = _complete(self.parser, ['sy'], workspace_dir='/ws')
         names = self._names(result)
-        self.assertEqual(names, ['sync'])
+        self.assertEqual(names, ['sync', 'sync-split'])
 
     def test_hidden_command_not_completed(self, _ws, _aliases):
         result = _complete(self.parser, ['c'], workspace_dir='/ws')

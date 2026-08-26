@@ -210,8 +210,8 @@ commit any files that need attention.
 
 ## Usage
 
-git-p4son provides eight commands: `init`, `sync`, `new`, `update`, `review`, `list-changes`, `alias`,
-and `completion`.
+git-p4son provides nine commands: `init`, `sync`, `sync-split`, `new`, `update`, `review`, `list-changes`,
+`alias`, and `completion`.
 
 To see help for any command, use `-h`:
 
@@ -291,6 +291,54 @@ changelists is given, the pre-sync hooks run once, before the first sync.
 
 After a successful `git-p4son sync` that actually performs sync work, git-p4son runs [hooks](#hooks)
 from `.git-p4son/hooks/post-sync/`.
+
+### Sync-Split Command
+
+Sync forward from the last synced changelist, splitting selected users' changelists into their own commits:
+
+```sh
+git p4son sync-split [changelist] [--user NAME ...] [--dry-run]
+```
+
+Syncing straight to the latest changelist lumps your own submitted changelists together with everyone
+else's in a single commit. `sync-split` resolves the sequence for you: it looks up the last synced
+changelist in the git log, asks Perforce which changelists the selected users submitted since then, and
+syncs the changelist submitted immediately before each of those first. The result is a git history where
+every changelist those users submitted is a commit containing nothing but their own change.
+
+By default the selected user is you (the current p4 user), which covers the common case of reviewing your
+own submits one at a time. Repeat `--user` to split out several people's changelists in the same run.
+
+It is equivalent to working out the numbers by hand and running
+`git p4son sync <before-theirs> <theirs> ... head`, and it delegates to `sync` once the sequence is
+resolved, so [pre-sync and post-sync hooks](#hooks), writable-file merging, and the clean-workspace checks
+all behave exactly as they do for `sync`.
+
+**Arguments:**
+- `changelist` (optional): Changelist number to sync up to, or `head` for the latest. Omit to sync to the
+  latest changelist affecting the workspace.
+
+**Options:**
+- `-u, --user NAME`: Perforce user whose changelists to split into their own commits. Repeat the flag to
+  select several users. Defaults to the current p4 user (from `p4 info`).
+- `-n, --dry-run`: Print the resolved sync sequence without syncing.
+
+**Examples:**
+```sh
+git p4son sync-split                  # sync to latest, your own changelists split out
+git p4son sync-split head             # same, explicit
+git p4son sync-split 12345            # stop at changelist 12345
+git p4son sync-split --dry-run        # show the sequence that would be synced
+git p4son sync-split -u alice         # split out alice's changelists instead of yours
+git p4son sync-split -u alice -u bob  # split out both alice's and bob's changelists
+```
+
+For example, with the last sync at CL 100 and your own changelists at 102 and 105, `sync-split` resolves
+to `git p4son sync 101 102 104 105 106`, producing five commits where CL 102 and CL 105 each hold only
+your change.
+
+`sync-split` only moves forward: it requires a previous sync to start from, and refuses a target older
+than the last synced changelist (use `git p4son sync --force` for that).
 
 ### New Command
 

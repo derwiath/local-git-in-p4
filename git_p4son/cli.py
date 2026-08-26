@@ -9,6 +9,7 @@ import time
 from importlib.resources import files
 from . import __version__
 from .sync import sync_command
+from .sync_split import sync_split_command
 from .new import new_command
 from .update import update_command
 from .list_changes import list_changes_command
@@ -36,6 +37,9 @@ Examples:
   git-p4son sync 123 156 178    # Sync each changelist in sequence, one commit each
   git-p4son sync 123 156 head   # Sync 123, 156, then the latest changelist
   git-p4son sync last-synced    # Re-sync the last synced changelist
+  git-p4son sync-split          # Sync to latest, your own changelists split out
+  git-p4son sync-split 12345    # Same, but stop at changelist 12345
+  git-p4son sync-split -u alice -u bob  # Split out alice's and bob's changelists
   git-p4son new -m "Fix bug"    # Create changelist, alias defaults to branch name
   git-p4son new -m "Fix bug" --review  # Create changelist, create Swarm review
   git-p4son new -m "Fix bug" --no-alias # Create changelist without saving an alias
@@ -94,6 +98,38 @@ Examples:
         '-f', '--force',
         action='store_true',
         help='Allow syncing to changelists older than the current one.'
+    )
+
+    # Sync-split subcommand
+    sync_split_parser = subparsers.add_parser(
+        'sync-split',
+        help='Sync forward, splitting a user\'s changelists into own commits',
+        description='Sync from the last synced changelist up to a target '
+        'changelist (the latest by default), syncing the changelist submitted '
+        'just before each of the selected users\' submits first so that every '
+        'changelist they submitted lands in a git commit of its own.'
+    )
+    sync_split_parser.add_argument(
+        'changelist',
+        nargs='?',
+        default=None,
+        metavar='CHANGELIST',
+        help='Changelist number to sync up to, or "head" for the latest. '
+             'Omit to sync to the latest changelist affecting the workspace'
+    )
+    sync_split_parser.add_argument(
+        '-u', '--user',
+        action='append',
+        default=None,
+        metavar='NAME',
+        help='Perforce user whose changelists to split into their own '
+             'commits. Repeat to select several users. '
+             'Defaults to the current p4 user'
+    )
+    sync_split_parser.add_argument(
+        '-n', '--dry-run',
+        action='store_true',
+        help='Print the resolved sync sequence without syncing'
     )
 
     # New subcommand
@@ -429,6 +465,8 @@ def run_command(args: argparse.Namespace) -> int:
 
     if args.command == 'sync':
         return sync_command(args)
+    elif args.command == 'sync-split':
+        return sync_split_command(args)
     elif args.command == 'new':
         return new_command(args)
     elif args.command == 'update':

@@ -30,6 +30,7 @@ from .perforce import (
     p4_fstat_file_info,
     p4_get_opened_files,
     p4_sync_preview,
+    P4ClientSpec,
     P4SyncOutputProcessor,
     P4SyncPreviewFile,
 )
@@ -554,28 +555,48 @@ def _sync_pass(changelist: int, label: str, depot_root: str,
     return prep
 
 
+@dataclass
+class ResolvedDepot:
+    """The configured depot root with any placeholder expanded, plus the
+    client spec it was resolved against."""
+    depot_root: str
+    client_spec: P4ClientSpec | None
+
+
+def resolve_depot_root(workspace_dir: str) -> ResolvedDepot | None:
+    """Resolve the configured depot root, or None (with an error logged).
+
+    The client spec is queried once here: its name resolves a $(workspace)
+    placeholder in the depot root, and its line-ending/clobber options feed
+    the writable-file handling in sync.
+    """
+    log.heading('Finding depot root')
+    depot_root = get_depot_root(workspace_dir)
+    if not depot_root:
+        log.error('No depot root configured. Run "git p4son init" first.')
+        return None
+
+    client_spec = get_client_spec(workspace_dir)
+    if WORKSPACE_PLACEHOLDER in depot_root and not client_spec:
+        log.error('Cannot resolve $(workspace) in depot root: not inside a '
+                  'Perforce workspace')
+        return None
+    if client_spec:
+        depot_root = expand_depot_root(depot_root, client_spec.name)
+    log.success(depot_root)
+    return ResolvedDepot(depot_root=depot_root, client_spec=client_spec)
+
+
 def sync_command(args: argparse.Namespace) -> int:
     """Execute the sync command."""
     workspace_dir = args.workspace_dir
     invocation_dir = vars(args).get('invocation_dir', workspace_dir)
 
-    log.heading('Finding depot root')
-    depot_root = get_depot_root(workspace_dir)
-    if not depot_root:
-        log.error('No depot root configured. Run "git p4son init" first.')
+    resolved = resolve_depot_root(workspace_dir)
+    if resolved is None:
         return 1
-
-    # The client spec is queried once here: its name resolves a $(workspace)
-    # placeholder in the depot root, and its line-ending/clobber options feed
-    # the writable-file handling further down.
-    client_spec = get_client_spec(workspace_dir)
-    if WORKSPACE_PLACEHOLDER in depot_root and not client_spec:
-        log.error('Cannot resolve $(workspace) in depot root: not inside a '
-                  'Perforce workspace')
-        return 1
-    if client_spec:
-        depot_root = expand_depot_root(depot_root, client_spec.name)
-    log.success(depot_root)
+    depot_root = resolved.depot_root
+    client_spec = resolved.client_spec
 
     log.heading('Checking git workspace')
     dirty_files = get_dirty_files(workspace_dir)

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add a `sync-split` command that syncs forward from the last synced changelist and splits selected users'
+  changelists into their own git commits. It finds the changelists those users submitted since the last
+  sync and syncs the changelist submitted immediately before each of them first, so each of their changes
+  lands in a commit containing nothing else. Defaults to the current p4 user; repeat `--user` to split out
+  several users in one run. Takes an optional changelist to stop at (`head` by default) and `--dry-run` to
+  print the resolved sequence without syncing
+
 
 ## 0.3.1
 
