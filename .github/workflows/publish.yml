@@ -4,6 +4,10 @@ on:
   push:
     tags:
       - 'v*'
+  # Manual trigger, so a run that never gets scheduled can be retried without
+  # deleting and re-pushing the tag. Pick the release tag as the ref: running
+  # it against a branch builds whatever version pyproject.toml currently has.
+  workflow_dispatch:
 
 jobs:
   test:
