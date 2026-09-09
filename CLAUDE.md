@@ -78,7 +78,6 @@ When bumping the minimum Python version, update all of these locations:
 
 ## Git Conventions
 
-- Never mention "Claude" or "Co-Authored-By: Claude" in commit messages.
 - Version bump commits should use the format: `Release git-p4son vX.Y.Z`
 - Never commit plan/analysis markdown files (e.g. `release-notes.md`, `default-message.md`) together with the
   implementation changes. These files are a communication tool between the user and Claude, not part of the codebase.
